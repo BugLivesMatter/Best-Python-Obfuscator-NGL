@@ -19,12 +19,23 @@ export default function App() {
   const [error, setError] = useState('');
   const [stats, setStats] = useState<Stats | null>(null);
   const [copied, setCopied] = useState(false);
+  const [hardMode, setHardMode] = useState(false);
+  const [bytecodeMode, setBytecodeMode] = useState(false);
+  const [aesEncryption, setAesEncryption] = useState(true);
+  const [cLoader, setCLoader] = useState(false);
+  const [pyobfusLike, setPyobfusLike] = useState(false);
+  const [exeLauncher, setExeLauncher] = useState(false);
+  const [exeLauncherGui, setExeLauncherGui] = useState(true);
+  const [cLoaderCode, setCLoaderCode] = useState('');
+  const [winLauncherCode, setWinLauncherCode] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleFileLoad = useCallback((code: string, name: string) => {
     setInputCode(code);
     setFileName(name);
     setOutputCode('');
+    setCLoaderCode('');
+    setWinLauncherCode('');
     setError('');
     setStats(null);
   }, []);
@@ -32,6 +43,8 @@ export default function App() {
   const handleClear = useCallback(() => {
     setInputCode('');
     setOutputCode('');
+    setCLoaderCode('');
+    setWinLauncherCode('');
     setError('');
     setStats(null);
     setFileName('');
@@ -41,6 +54,8 @@ export default function App() {
     setInputCode(v);
     if (outputCode) {
       setOutputCode('');
+      setCLoaderCode('');
+      setWinLauncherCode('');
       setStats(null);
     }
     setError('');
@@ -58,8 +73,17 @@ export default function App() {
           encryptStrings: true,
           injectJunk: true,
           minify: true,
+          hard: hardMode,
+          bytecodeMode,
+          aesEncryption,
+          cLoader,
+          pyobfusLike,
+          exeLauncher,
+          exeLauncherGui,
         });
         setOutputCode(result.code);
+        setCLoaderCode(result.cLoaderCode ?? '');
+        setWinLauncherCode(result.winLauncherCode ?? '');
         setStats(result.stats);
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Obfuscation failed');
@@ -67,7 +91,7 @@ export default function App() {
         setIsObfuscating(false);
       }
     }, 50);
-  }, [inputCode]);
+  }, [inputCode, hardMode, bytecodeMode, aesEncryption, cLoader, pyobfusLike, exeLauncher, exeLauncherGui]);
 
   const handleCopy = useCallback(async () => {
     await navigator.clipboard.writeText(outputCode);
@@ -84,6 +108,27 @@ export default function App() {
     a.click();
     URL.revokeObjectURL(url);
   }, [outputCode, fileName]);
+
+  const handleDownloadCLoader = useCallback(() => {
+    const blob = new Blob([cLoaderCode], { type: 'text/plain' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = fileName ? `loader_${fileName.replace(/\.py$/i, '')}.c` : 'loader.c';
+    a.click();
+    URL.revokeObjectURL(url);
+  }, [cLoaderCode, fileName]);
+
+  const handleDownloadWinLauncher = useCallback(() => {
+    const blob = new Blob([winLauncherCode], { type: 'text/plain' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    const base = fileName ? fileName.replace(/\.py$/i, '') : 'launcher';
+    a.download = `${base}_launcher.c`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }, [winLauncherCode, fileName]);
 
   const handleFileInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -194,24 +239,97 @@ export default function App() {
             </button>
           </div>
 
-          {/* Center: obfuscate */}
-          <button
-            onClick={handleObfuscate}
-            disabled={!inputCode.trim() || isObfuscating}
-            className="flex items-center gap-2 px-6 py-2.5 rounded-lg bg-white text-black font-bold text-xs hover:bg-white/90 disabled:opacity-30 disabled:cursor-not-allowed transition-all shadow-lg shadow-white/10 active:scale-95"
-          >
-            {isObfuscating ? (
-              <>
-                <div className="w-3 h-3 border-2 border-black/30 border-t-black rounded-full animate-spin" />
-                obfuscating...
-              </>
-            ) : (
-              <>
-                <Zap size={14} />
-                obfuscate
-              </>
-            )}
-          </button>
+          {/* Center: obfuscate + hard mode toggle */}
+          <div className="flex flex-col items-center gap-1">
+            <button
+              onClick={handleObfuscate}
+              disabled={!inputCode.trim() || isObfuscating}
+              className="flex items-center gap-2 px-6 py-2.5 rounded-lg bg-white text-black font-bold text-xs hover:bg-white/90 disabled:opacity-30 disabled:cursor-not-allowed transition-all shadow-lg shadow-white/10 active:scale-95"
+            >
+              {isObfuscating ? (
+                <>
+                  <div className="w-3 h-3 border-2 border-black/30 border-t-black rounded-full animate-spin" />
+                  obfuscating...
+                </>
+              ) : (
+                <>
+                  <Zap size={14} />
+                  obfuscate
+                </>
+              )}
+            </button>
+            <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-1">
+              <label className="flex items-center gap-2 text-[10px] font-mono text-white/40 select-none">
+                <input
+                  type="checkbox"
+                  checked={hardMode}
+                  onChange={(e) => setHardMode(e.target.checked)}
+                  className="h-3 w-3 rounded border border-white/30 bg-black/40 accent-white"
+                />
+                <span>hard obfuscation</span>
+              </label>
+              <label className="flex items-center gap-2 text-[10px] font-mono text-white/40 select-none">
+                <input
+                  type="checkbox"
+                  checked={bytecodeMode}
+                  onChange={(e) => setBytecodeMode(e.target.checked)}
+                  className="h-3 w-3 rounded border border-white/30 bg-black/40 accent-white"
+                />
+                <span>bytecode mode</span>
+              </label>
+              <label className="flex items-center gap-2 text-[10px] font-mono text-white/40 select-none">
+                <input
+                  type="checkbox"
+                  checked={aesEncryption}
+                  onChange={(e) => setAesEncryption(e.target.checked)}
+                  className="h-3 w-3 rounded border border-white/30 bg-black/40 accent-white"
+                />
+                <span>AES encryption</span>
+              </label>
+              <label className="flex items-center gap-2 text-[10px] font-mono text-white/40 select-none">
+                <input
+                  type="checkbox"
+                  checked={cLoader}
+                  onChange={(e) => setCLoader(e.target.checked)}
+                  disabled={!bytecodeMode}
+                  className="h-3 w-3 rounded border border-white/30 bg-black/40 accent-white disabled:opacity-40"
+                />
+                <span>C loader</span>
+              </label>
+              <label className="flex items-center gap-2 text-[10px] font-mono text-white/40 select-none" title="I0/I1 name mangling, control flow flattening, anti-debug, docstring removal, param preservation">
+                <input
+                  type="checkbox"
+                  checked={pyobfusLike}
+                  onChange={(e) => setPyobfusLike(e.target.checked)}
+                  className="h-3 w-3 rounded border border-white/30 bg-black/40 accent-white"
+                />
+                <span>pyobfus-like</span>
+              </label>
+              <label
+                className="flex items-center gap-2 text-[10px] font-mono text-white/40 select-none"
+                title="Encrypt .py without key. A companion C launcher (.exe) holds the key and pipes it to Python at runtime."
+              >
+                <input
+                  type="checkbox"
+                  checked={exeLauncher}
+                  onChange={(e) => { setExeLauncher(e.target.checked); if (e.target.checked) setBytecodeMode(true); }}
+                  className="h-3 w-3 rounded border border-white/30 bg-black/40 accent-white"
+                />
+                <span>exe launcher</span>
+              </label>
+              {exeLauncher && (
+                <label className="flex items-center gap-2 text-[10px] font-mono text-white/30 select-none" title="Compile launcher without console window (for GUI apps)">
+                  <input
+                    type="checkbox"
+                    checked={exeLauncherGui}
+                    onChange={(e) => setExeLauncherGui(e.target.checked)}
+                    className="h-3 w-3 rounded border border-white/30 bg-black/40 accent-white"
+                  />
+                  <span>gui (no console)</span>
+                </label>
+              )}
+            </div>
+          </div>
 
           {/* Right: output actions */}
           <div className="flex items-center gap-2">
@@ -223,6 +341,18 @@ export default function App() {
               <Download size={13} />
               download
             </button>
+            {cLoaderCode && (
+              <button onClick={handleDownloadCLoader} className={btnBase} title="Download C loader">
+                <Download size={13} />
+                download C
+              </button>
+            )}
+            {winLauncherCode && (
+              <button onClick={handleDownloadWinLauncher} className={btnBase} title="Download Windows .exe launcher C source">
+                <Download size={13} />
+                download launcher.c
+              </button>
+            )}
           </div>
         </div>
       </div>

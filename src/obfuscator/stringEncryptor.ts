@@ -10,8 +10,9 @@ const VAR_LEN = 22;
 
 export interface EncryptedString {
   varName: string;
-  encryptedB64: string;
+  stored: string;
   original: string;
+  scheme: number;
 }
 
 function genHexName(counter: number, usedNames: Set<string>): string {
@@ -115,8 +116,8 @@ function unescapePython(raw: string): string {
  * Encrypts all encryptable string tokens using AES-CBC (OpenSSL KDF / CryptoJS format).
  * Generates hex-looking variable names for each unique string.
  * Returns:
- *  - encrypted: list of {varName, encryptedB64} records for the preamble
- *  - posToVarName: maps token.start → "decryptFunc(varName)" replacement text
+ *  - encrypted: list of {varName, stored, scheme} records for the preamble
+ *  - posToVarName: maps token.start → "decryptFunc(varName, scheme)" replacement text
  */
 export function encryptStrings(
   stringTokenIndices: number[],
@@ -124,13 +125,14 @@ export function encryptStrings(
   _nameGen: NameGenerator,
   decryptFuncName: string,
   usedHexNames: Set<string>,
+  hard: boolean,
 ): {
   encrypted: EncryptedString[];
   posToVarName: Map<number, string>;
 } {
   const encrypted: EncryptedString[] = [];
   const posToVarName = new Map<number, string>();
-  const contentToVar = new Map<string, string>();
+  const contentToInfo = new Map<string, { varName: string; scheme: number }>();
   let hexCounter = 0;
 
   for (const idx of stringTokenIndices) {
@@ -146,19 +148,26 @@ export function encryptStrings(
       catch { continue; }
     }
 
-    // Deduplicate: same content → same variable
-    if (contentToVar.has(content)) {
-      const varName = contentToVar.get(content)!;
-      posToVarName.set(tok.start, `${decryptFuncName}(${varName})`);
+    // Deduplicate: same content → same variable (same scheme)
+    if (contentToInfo.has(content)) {
+      const info = contentToInfo.get(content)!;
+      posToVarName.set(tok.start, `${decryptFuncName}(${info.varName},${info.scheme})`);
       continue;
     }
 
     try {
       const encB64 = CryptoJS.AES.encrypt(content, AES_PASSWORD).toString();
       const varName = genHexName(hexCounter++, usedHexNames);
-      encrypted.push({ varName, encryptedB64: encB64, original: content });
-      contentToVar.set(content, varName);
-      posToVarName.set(tok.start, `${decryptFuncName}(${varName})`);
+      const scheme = hard ? (hexCounter % 2) : 0;
+      let stored: string;
+      if (scheme === 1) {
+        stored = encB64.split('').reverse().join('');
+      } else {
+        stored = encB64;
+      }
+      encrypted.push({ varName, stored, original: content, scheme });
+      contentToInfo.set(content, { varName, scheme });
+      posToVarName.set(tok.start, `${decryptFuncName}(${varName},${scheme})`);
     } catch {
       // Skip strings that fail to encrypt
     }
@@ -180,6 +189,7 @@ export function encryptStrings(
 export function generateDecryptPreamble(
   encrypted: EncryptedString[],
   decryptFuncName: string,
+  hard = false,
 ): string {
   if (encrypted.length === 0) return '';
 
@@ -187,16 +197,80 @@ export function generateDecryptPreamble(
     'import base64 as _b64,hashlib as _hl',
     'from Crypto.Cipher import AES as _AES',
     'from Crypto.Util.Padding import unpad as _up',
-    `def ${decryptFuncName}(__s):`,
-    `    __d=_b64.b64decode(__s);__t=__d[8:16];__c=__d[16:]`,
-    `    __k=b'';__m=b''`,
-    `    while len(__k)<48:__m=_hl.md5(__m+b'll11lll1'+__t).digest();__k+=__m`,
-    `    return _up(_AES.new(__k[:32],_AES.MODE_CBC,__k[32:48]).decrypt(__c),16).decode()`,
+    'def _dec_core(__s):',
+    '    __d=_b64.b64decode(__s);__t=__d[8:16];__c=__d[16:]',
+    "    __k=b'';__m=b''",
+    "    while len(__k)<48:__m=_hl.md5(__m+b'll11lll1'+__t).digest();__k+=__m",
+    '    return _up(_AES.new(__k[:32],_AES.MODE_CBC,__k[32:48]).decrypt(__c),16).decode()',
     '',
   ];
 
+  if (!hard) {
+    lines.push(
+      `def ${decryptFuncName}(__v,__scheme=0):`,
+      '    if __scheme==0:',
+      '        return _dec_core(__v)',
+      '    if __scheme==1:',
+      '        return _dec_core(__v[::-1])',
+      '',
+    );
+  } else {
+    lines.push(
+      `def ${decryptFuncName}(__v,__scheme=0):`,
+      '    def _dec_core(__s):',
+      '        __d=_b64.b64decode(__s);__t=__d[8:16];__c=__d[16:]',
+      "        __k=b'';__m=b''",
+      "        while len(__k)<48:__m=_hl.md5(__m+b'll11lll1'+__t).digest();__k+=__m",
+      '        return _up(_AES.new(__k[:32],_AES.MODE_CBC,__k[32:48]).decrypt(__c),16).decode()',
+      '    __s=0',
+      '    __s+=1',
+      '    try:',
+      '        raise MemoryError(__s)',
+      '    except MemoryError as __e:',
+      '        if __e.args[0]==1:',
+      '            if __scheme==0:',
+      '                __r=_dec_core(__v)',
+      '            elif __scheme==1:',
+      '                __r=_dec_core(__v[::-1])',
+      '            else:',
+      '                __r=_dec_core(__v)',
+      '            try:',
+      '                if _TAMPERED[0] and isinstance(__r,str) and __r:',
+      '                    return __r[::-1]',
+      '            except Exception:',
+      '                pass',
+      '            return __r',
+      '',
+    );
+  }
+
+  // String constants used by decryptor
   for (const enc of encrypted) {
-    lines.push(`${enc.varName}="${enc.encryptedB64}"`);
+    lines.push(`${enc.varName}="${enc.stored}"`);
+  }
+
+  if (hard) {
+    const concat = encrypted.map((e) => e.stored).join('');
+    const hashHex = CryptoJS.SHA256(concat).toString();
+    const varList = encrypted.map((e) => e.varName).join(',');
+    lines.push(
+      '',
+      `_STR_CONSTS=[${varList}]`,
+      `_EXPECTED_STR_HASH="${hashHex}"`,
+      'def _do_str_verify():',
+      '    global _TAMPERED',
+      '    _TAMPERED=[False]',
+      '    def _ihash_strs():',
+      '        try:',
+      "            return _hl.sha256(''.join(_STR_CONSTS).encode()).hexdigest()",
+      '        except Exception:',
+      '            return None',
+      '    __h=_ihash_strs()',
+      '    if __h is None or __h!=_EXPECTED_STR_HASH:',
+      '        _TAMPERED[0]=True',
+      '_do_str_verify()',
+      '',
+    );
   }
 
   lines.push('');

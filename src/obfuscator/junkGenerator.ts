@@ -22,6 +22,41 @@ const JUNK_EXPRESSIONS: ((v: string) => string)[] = [
   (v) => `${v}=not False;${v}=not ${v}`,
   (v) => `${v}=hash(None)`,
   (v) => `${v}=abs(0)`,
+  (v) => `${v}=str();len(${v})`,
+  (v) => `${v}=iter([]);next(${v},None)`,
+  (v) => `${v}=tuple();bool(${v})`,
+  (_) => `{k:v for k,v in {}.items()}`,
+  (v) => `${v}=object();isinstance(${v},object)`,
+  (v) => `${v}=repr(None);${v}=${v}`,
+];
+
+const HARD_JUNK_EXPRESSIONS: ((v: string) => string)[] = [
+  (v) => `${v}=0\n${v}+=1\ntry:\n    raise MemoryError(${v})\nexcept MemoryError as ${v}e:\n    if ${v}e.args[0]==1:\n        ${v}=None`,
+  (v) => `try:\n    raise MemoryError(1)\nexcept MemoryError as ${v}e:\n    ${v}=(${v}e.args[0]==1) and None`,
+  (v) => `${v}=bool(bool(bool(type))) if bool(type(int(1)>int(0))) and bool(str(int(0)))>2 else bool`,
+  (v) => `(lambda *_a,**_k:None)();${v}=None`,
+  (v) => `${v}={x:x**2 for x in []}`,
+  (v) => `${v}=0\nfor ${v}i in range(0):\n    ${v}+=1`,
+  (v) => `if (lambda:True)() and (lambda:False)():\n    ${v}=1\nelse:\n    ${v}=0`,
+  (v) => `${v}=bytes(0).decode()`,
+  (v) => `${v}=dict(zip([],[]))`,
+  (v) => `${v}=tuple(sorted([],key=lambda x:x))`,
+  (v) => `${v}=sum(x for x in [] if x)`,
+  (v) => `${v}=any(False for _ in range(0))`,
+  (v) => `${v}=all(True for _ in range(0))`,
+  (v) => `if (int(1)+int(0))%2==1:\n    ${v}=None`,
+  (v) => `${v}=0\ntry:\n    ${v}=int(bool(type(None)))\nexcept Exception:\n    pass`,
+  (v) => `${v}=callable(type) and None or None`,
+  (v) => `${v}=getattr(getattr(type,'__name__',None),'__len__',lambda:0)()`,
+  (v) => `class ${v}c:\n    pass\n${v}=${v}c();del ${v}c;del ${v}`,
+  (v) => `${v}=frozenset();${v}=set(${v})`,
+  (v) => `${v}=memoryview(b'').tobytes()`,
+  (v) => `${v}=object;type(${v}) if (lambda:object)() else (lambda:type)()`,
+  (v) => `${v}=enumerate([]);list(${v})`,
+  (v) => `${v}=reversed([]);[_ for _ in ${v}]`,
+  (v) => `${v}=(lambda:[])().copy();${v}.append(None)`,
+  (v) => `${v}=bytearray();${v}.clear()`,
+  (v) => `${v}=slice(None);${v}.start or ${v}.stop`,
 ];
 
 // ─── Single-line comments (large bank of realistic-looking ones) ──────────────
@@ -184,12 +219,12 @@ function pickInt(seed: number, min: number, max: number): number {
 /**
  * Generates a junk block (optional comment header + 1-3 expressions).
  */
-export function generateJunkBlock(nameGen: NameGenerator, seed: number, indent: string): string {
+export function generateJunkBlock(nameGen: NameGenerator, seed: number, indent: string, hard = false): string {
   const lines: string[] = [];
 
-  // Add a comment header ~55% of the time
+  // Add a comment header (частота выше в hard-режиме — для обмана ИИ)
   const r = lcg(seed * 31);
-  if (r < 0.55) {
+  if (r < (hard ? 0.92 : 0.7)) {
     // Multi-line comment ~30% of those
     if (r < 0.17) {
       const blockIdx = pickInt(seed * 7, 0, MULTI_COMMENTS.length - 1);
@@ -202,11 +237,13 @@ export function generateJunkBlock(nameGen: NameGenerator, seed: number, indent: 
     }
   }
 
-  const count = 1 + pickInt(seed, 0, 2);
+  const count = hard ? (3 + pickInt(seed, 0, 4)) : (2 + pickInt(seed, 0, 3));
   for (let i = 0; i < count; i++) {
     const varName = nameGen.next();
-    const exprIdx = pickInt(seed + i * 7 + 3, 0, JUNK_EXPRESSIONS.length - 1);
-    const expr = JUNK_EXPRESSIONS[exprIdx](varName);
+    const useHardPool = hard && lcg(seed + i * 11) > 0.35;
+    const pool = useHardPool ? HARD_JUNK_EXPRESSIONS : JUNK_EXPRESSIONS;
+    const exprIdx = pickInt(seed + i * 7 + 3, 0, pool.length - 1);
+    const expr = pool[exprIdx](varName);
     for (const el of expr.split('\n')) {
       lines.push(indent + el);
     }
@@ -319,7 +356,7 @@ const CONTINUATIONS = /^(else\b|elif\b|except\b|finally\b)/;
  * 3. BEFORE every return/yield statement
  * 4. Occasionally at module level between statements
  */
-export function injectJunkCode(source: string, nameGen: NameGenerator): string {
+export function injectJunkCode(source: string, nameGen: NameGenerator, hard = false): string {
   const lines = source.split('\n');
   const complete = buildCompleteMap(lines);
   const result: string[] = [];
@@ -359,7 +396,7 @@ export function injectJunkCode(source: string, nameGen: NameGenerator): string {
       (trimmed.startsWith('return') || trimmed.startsWith('yield')) &&
       !BLOCK_OPENERS.test(trimmed)
     ) {
-      result.push(generateJunkBlock(nameGen, seed++, indent));
+      result.push(generateJunkBlock(nameGen, seed++, indent, hard));
     }
 
     result.push(line);
@@ -371,7 +408,7 @@ export function injectJunkCode(source: string, nameGen: NameGenerator): string {
     if (complete[i] && BLOCK_OPENERS.test(trimmed) && trimmed.trimEnd().endsWith(':')) {
       const bi = bodyIndentOf(i, indent);
       if (bi !== null) {
-        result.push(generateJunkBlock(nameGen, seed++, bi));
+        result.push(generateJunkBlock(nameGen, seed++, bi, hard));
         continue;
       }
     }
@@ -385,15 +422,36 @@ export function injectJunkCode(source: string, nameGen: NameGenerator): string {
     // ── 2. Middle injections ──────────────────────────────────────────────────
     middleCounter++;
 
+    // Не вставлять junk, если текущая строка — продолжение предыдущей (внутри вызова/литерала).
+    // Иначе junk получит отступ аргумента и даст IndentationError после закрывающей ).
+    const prevSourceLine = i > 0 ? lines[i - 1].trimEnd() : '';
+    const isContinuationLine =
+      prevSourceLine.endsWith('(') ||
+      prevSourceLine.endsWith('[') ||
+      prevSourceLine.endsWith('{') ||
+      prevSourceLine.endsWith(',') ||
+      prevSourceLine.endsWith('\\');
+
+    // Только пропуск после незакрытых скобок — ) ] } безопасны при правильном indent
+    const unsafeEnd = ['(', '[', '{', ',', '\\'];
+
+    const modInterval = hard ? 2 : 4;
+    const blockInterval = hard ? 1 : 2;
     if (indent === '') {
-      // Module level: ~every 5 eligible lines
-      if (middleCounter % 5 === 0) {
-        result.push(generateJunkBlock(nameGen, seed++, indent));
+      if (middleCounter % modInterval === 0 && !isContinuationLine) {
+        const prev = result[result.length - 1] ?? '';
+        const prevTrim = prev.trimEnd();
+        if (!unsafeEnd.some((c) => prevTrim.endsWith(c))) {
+          result.push(generateJunkBlock(nameGen, seed++, indent, hard));
+        }
       }
     } else {
-      // Inside a block: ~every 3 eligible lines
-      if (middleCounter % 3 === 0) {
-        result.push(generateJunkBlock(nameGen, seed++, indent));
+      if (middleCounter % blockInterval === 0 && !isContinuationLine) {
+        const prev = result[result.length - 1] ?? '';
+        const prevTrim = prev.trimEnd();
+        if (!unsafeEnd.some((c) => prevTrim.endsWith(c))) {
+          result.push(generateJunkBlock(nameGen, seed++, indent, hard));
+        }
       }
     }
   }

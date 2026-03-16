@@ -1,16 +1,21 @@
 /**
  * Generates confusing names made of 'l', 'I', '1'.
  * First character is always 'l' or 'I' (never '1', as it looks like a number).
+ * pyobfus-like mode: I0, I1, I2, ... (digit suffix)
  */
 
 const CHARS = ['l', 'I', '1'];
 const FIRST_CHARS = ['l', 'I'];
 
+export type NameStyle = 'lI1' | 'In';
+
 export class NameGenerator {
   private used = new Set<string>();
   private counter = 0;
+  private style: NameStyle;
 
-  constructor(existingNames?: Set<string>) {
+  constructor(existingNames?: Set<string>, style: NameStyle = 'lI1') {
+    this.style = style;
     if (existingNames) {
       for (const n of existingNames) this.used.add(n);
     }
@@ -19,12 +24,20 @@ export class NameGenerator {
   /** Generate the next unique confusing name. */
   next(): string {
     while (true) {
-      const name = this.fromIndex(this.counter++);
+      const name =
+        this.style === 'In'
+          ? this.fromIndexIn(this.counter++)
+          : this.fromIndex(this.counter++);
       if (!this.used.has(name)) {
         this.used.add(name);
         return name;
       }
     }
+  }
+
+  /** pyobfus-like: I0, I1, I2, ... */
+  private fromIndexIn(idx: number): string {
+    return `I${idx}`;
   }
 
   private fromIndex(idx: number): string {

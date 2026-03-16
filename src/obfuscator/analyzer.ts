@@ -82,11 +82,19 @@ function parseFuncParams(tokens: Token[], openParenIdx: number): string[] {
   return params;
 }
 
+export interface CollectRenameableOptions {
+  preserveParamNames?: boolean;
+}
+
 /**
  * Collects all user-defined identifiers that can be safely renamed.
  * Returns a Set of identifier names.
  */
-export function collectRenameableNames(tokens: Token[]): Set<string> {
+export function collectRenameableNames(
+  tokens: Token[],
+  options: CollectRenameableOptions = {},
+): Set<string> {
+  const preserveParamNames = options.preserveParamNames === true;
   const renameable = new Set<string>();
   const importedFromExternal = new Set<string>(); // from X import name (don't rename)
 
@@ -121,10 +129,12 @@ export function collectRenameableNames(tokens: Token[]): Set<string> {
           const name = tokens[ni].value;
           if (!isProtectedName(name)) renameable.add(name);
 
-          // Parse params: find the '('
-          const pi = nextMeaningful(tokens, ni + 1);
-          if (pi >= 0 && tokens[pi].value === '(') {
-            parseFuncParams(tokens, pi).forEach(p => renameable.add(p));
+          // Parse params: find the '(' — skip if preserveParamNames (pyobfus-like)
+          if (!preserveParamNames) {
+            const pi = nextMeaningful(tokens, ni + 1);
+            if (pi >= 0 && tokens[pi].value === '(') {
+              parseFuncParams(tokens, pi).forEach(p => renameable.add(p));
+            }
           }
         }
         i++;
@@ -197,19 +207,20 @@ export function collectRenameableNames(tokens: Token[]): Set<string> {
 
       // lambda NAME, NAME=default, *NAME, **NAME :
       if (tok.value === 'lambda') {
-        let j = nextMeaningful(tokens, i + 1);
-        while (j >= 0) {
-          const t = tokens[j];
-          if (t.type === 'OP' && t.value === ':') break;
-          if (t.type === 'IDENTIFIER' && !isProtectedName(t.value)) {
-            // Check it's a param name (before , : =)
-            const nj = nextMeaningful(tokens, j + 1);
-            const nt = nj >= 0 ? tokens[nj] : null;
-            if (nt && nt.type === 'OP' && [',', ':', '='].includes(nt.value)) {
-              renameable.add(t.value);
+        if (!preserveParamNames) {
+          let j = nextMeaningful(tokens, i + 1);
+          while (j >= 0) {
+            const t = tokens[j];
+            if (t.type === 'OP' && t.value === ':') break;
+            if (t.type === 'IDENTIFIER' && !isProtectedName(t.value)) {
+              const nj = nextMeaningful(tokens, j + 1);
+              const nt = nj >= 0 ? tokens[nj] : null;
+              if (nt && nt.type === 'OP' && [',', ':', '='].includes(nt.value)) {
+                renameable.add(t.value);
+              }
             }
+            j = nextMeaningful(tokens, j + 1);
           }
-          j = nextMeaningful(tokens, j + 1);
         }
         i++;
         continue;

@@ -161,13 +161,39 @@ function renameFString(tokenValue: string, nameMapping: Map<string, string>): st
   return prefix + quoteStr + renamed + quoteStr;
 }
 
+// ─── Docstring detection (for stripping) ───────────────────────────────────────
+
+function isDocstringToken(tokens: Token[], i: number): boolean {
+  const tok = tokens[i];
+  if (tok.type !== 'STRING') return false;
+  const val = tok.value;
+  if (!val.startsWith('"""') && !val.startsWith("'''")) return false;
+
+  const prev = prevMeaningful(tokens, i - 1);
+  const prevTok = prev >= 0 ? tokens[prev] : null;
+
+  // Module docstring: at start of file
+  if (prevTok === null) return true;
+
+  // After ':' — def/class/with/try etc.
+  if (prevTok.type === 'OP' && prevTok.value === ':') return true;
+
+  return false;
+}
+
 // ─── Main transformation pass ─────────────────────────────────────────────────
+
+export interface TransformOptions {
+  stripDocstrings?: boolean;
+}
 
 export function applyTransformations(
   tokens: Token[],
   nameMapping: Map<string, string>,
   posToVarName: Map<number, string>,
+  options: TransformOptions = {},
 ): string {
+  const stripDocstrings = options.stripDocstrings === true;
   const parts: string[] = [];
   const stack: boolean[] = []; // true = param list (def/class/lambda), false = call
   let nextParenIsParam = false;
@@ -188,6 +214,11 @@ export function applyTransformations(
     }
     if (tok.type !== 'WHITESPACE' && tok.type !== 'COMMENT' && tok.type !== 'NEWLINE' && tok.type !== 'OP') {
       nextParenIsParam = false;
+    }
+
+    // ── Strip docstrings (pyobfus-like) ──────────────────────────────────────
+    if (stripDocstrings && isDocstringToken(tokens, i)) {
+      continue;
     }
 
     // ── Strip comments ──────────────────────────────────────────────────────
