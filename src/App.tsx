@@ -159,9 +159,10 @@ export default function App() {
           <button
             onClick={() => setShowHelp(true)}
             title="Settings reference"
-            className="absolute top-1/2 right-0 -translate-y-1/2 p-2 rounded-lg text-white/35 hover:text-white/80 hover:bg-white/8 transition-all"
+            className="absolute top-1/2 right-0 -translate-y-1/2 z-20 flex items-center gap-1.5 px-3 py-2 rounded-lg border border-white/10 bg-black/40 hover:bg-white/5 hover:border-white/25 text-white/50 hover:text-white/80 transition-all text-xs font-mono backdrop-blur-sm"
           >
-            <BookOpen size={17} />
+            <BookOpen size={13} />
+            guide
           </button>
         </div>
 
