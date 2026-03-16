@@ -1,0 +1,22 @@
+# Build output
+dist/
+
+# Dependencies
+node_modules/
+
+# Lock files (rarely need to read directly)
+package-lock.json
+yarn.lock
+pnpm-lock.yaml
+
+# TypeScript build cache
+*.tsbuildinfo
+node_modules/.tmp/
+
+# Generated example files
+obf_example.py
+obf_example_launcher.c
+example.py
+
+# Vite cache
+.vite/

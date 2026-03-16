@@ -2,8 +2,9 @@ import { useState, useCallback, useRef } from 'react';
 import Background from './components/Background';
 import Header from './components/Header';
 import CodePanel from './components/CodePanel';
+import HelpPanel from './components/HelpPanel';
 import { obfuscate } from './obfuscator/index';
-import { Zap, Copy, Download, Trash2, Upload, CheckCircle2, AlertCircle } from 'lucide-react';
+import { Zap, Copy, Download, Trash2, Upload, CheckCircle2, AlertCircle, BookOpen } from 'lucide-react';
 
 interface Stats {
   renamedCount: number;
@@ -22,19 +23,17 @@ export default function App() {
   const [hardMode, setHardMode] = useState(false);
   const [bytecodeMode, setBytecodeMode] = useState(false);
   const [aesEncryption, setAesEncryption] = useState(true);
-  const [cLoader, setCLoader] = useState(false);
   const [pyobfusLike, setPyobfusLike] = useState(false);
   const [exeLauncher, setExeLauncher] = useState(false);
   const [exeLauncherGui, setExeLauncherGui] = useState(true);
-  const [cLoaderCode, setCLoaderCode] = useState('');
   const [winLauncherCode, setWinLauncherCode] = useState('');
+  const [showHelp, setShowHelp] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleFileLoad = useCallback((code: string, name: string) => {
     setInputCode(code);
     setFileName(name);
     setOutputCode('');
-    setCLoaderCode('');
     setWinLauncherCode('');
     setError('');
     setStats(null);
@@ -43,7 +42,6 @@ export default function App() {
   const handleClear = useCallback(() => {
     setInputCode('');
     setOutputCode('');
-    setCLoaderCode('');
     setWinLauncherCode('');
     setError('');
     setStats(null);
@@ -54,7 +52,6 @@ export default function App() {
     setInputCode(v);
     if (outputCode) {
       setOutputCode('');
-      setCLoaderCode('');
       setWinLauncherCode('');
       setStats(null);
     }
@@ -76,13 +73,11 @@ export default function App() {
           hard: hardMode,
           bytecodeMode,
           aesEncryption,
-          cLoader,
           pyobfusLike,
           exeLauncher,
           exeLauncherGui,
         });
         setOutputCode(result.code);
-        setCLoaderCode(result.cLoaderCode ?? '');
         setWinLauncherCode(result.winLauncherCode ?? '');
         setStats(result.stats);
       } catch (err) {
@@ -91,7 +86,7 @@ export default function App() {
         setIsObfuscating(false);
       }
     }, 50);
-  }, [inputCode, hardMode, bytecodeMode, aesEncryption, cLoader, pyobfusLike, exeLauncher, exeLauncherGui]);
+  }, [inputCode, hardMode, bytecodeMode, aesEncryption, pyobfusLike, exeLauncher, exeLauncherGui]);
 
   const handleCopy = useCallback(async () => {
     await navigator.clipboard.writeText(outputCode);
@@ -99,36 +94,28 @@ export default function App() {
     setTimeout(() => setCopied(false), 2000);
   }, [outputCode]);
 
+  // Base name shared by both output files (same name, different extension)
+  const outputBase = fileName ? fileName.replace(/\.py$/i, '') : 'obfuscated';
+
   const handleDownload = useCallback(() => {
     const blob = new Blob([outputCode], { type: 'text/plain' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = fileName ? `obf_${fileName}` : 'obfuscated.py';
+    a.download = `${outputBase}.py`;
     a.click();
     URL.revokeObjectURL(url);
-  }, [outputCode, fileName]);
-
-  const handleDownloadCLoader = useCallback(() => {
-    const blob = new Blob([cLoaderCode], { type: 'text/plain' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = fileName ? `loader_${fileName.replace(/\.py$/i, '')}.c` : 'loader.c';
-    a.click();
-    URL.revokeObjectURL(url);
-  }, [cLoaderCode, fileName]);
+  }, [outputCode, outputBase]);
 
   const handleDownloadWinLauncher = useCallback(() => {
     const blob = new Blob([winLauncherCode], { type: 'text/plain' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    const base = fileName ? fileName.replace(/\.py$/i, '') : 'launcher';
-    a.download = `${base}_launcher.c`;
+    a.download = `${outputBase}.c`;
     a.click();
     URL.revokeObjectURL(url);
-  }, [winLauncherCode, fileName]);
+  }, [winLauncherCode, outputBase]);
 
   const handleFileInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -162,12 +149,20 @@ export default function App() {
 
   return (
     <div className="relative h-screen text-white overflow-hidden flex flex-col">
+      {showHelp && <HelpPanel onClose={() => setShowHelp(false)} />}
       <Background />
 
       <div className="relative z-10 flex flex-col h-full max-w-[90rem] w-full mx-auto px-4">
         {/* Header — shrinks to content */}
-        <div className="shrink-0">
+        <div className="shrink-0 relative">
           <Header />
+          <button
+            onClick={() => setShowHelp(true)}
+            title="Settings reference"
+            className="absolute top-1/2 right-0 -translate-y-1/2 p-2 rounded-lg text-white/35 hover:text-white/80 hover:bg-white/8 transition-all"
+          >
+            <BookOpen size={17} />
+          </button>
         </div>
 
         {/* Panels — fill remaining space */}
@@ -286,16 +281,6 @@ export default function App() {
                 />
                 <span>AES encryption</span>
               </label>
-              <label className="flex items-center gap-2 text-[10px] font-mono text-white/40 select-none">
-                <input
-                  type="checkbox"
-                  checked={cLoader}
-                  onChange={(e) => setCLoader(e.target.checked)}
-                  disabled={!bytecodeMode}
-                  className="h-3 w-3 rounded border border-white/30 bg-black/40 accent-white disabled:opacity-40"
-                />
-                <span>C loader</span>
-              </label>
               <label className="flex items-center gap-2 text-[10px] font-mono text-white/40 select-none" title="I0/I1 name mangling, control flow flattening, anti-debug, docstring removal, param preservation">
                 <input
                   type="checkbox"
@@ -341,16 +326,10 @@ export default function App() {
               <Download size={13} />
               download
             </button>
-            {cLoaderCode && (
-              <button onClick={handleDownloadCLoader} className={btnBase} title="Download C loader">
-                <Download size={13} />
-                download C
-              </button>
-            )}
             {winLauncherCode && (
-              <button onClick={handleDownloadWinLauncher} className={btnBase} title="Download Windows .exe launcher C source">
+              <button onClick={handleDownloadWinLauncher} className={btnBase} title="Download exe launcher C source">
                 <Download size={13} />
-                download launcher.c
+                download .c
               </button>
             )}
           </div>

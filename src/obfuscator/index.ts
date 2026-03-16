@@ -20,6 +20,7 @@ function randomHexKey(bytes = 32): string {
   } else {
     // Node.js fallback
     // eslint-disable-next-line @typescript-eslint/no-require-imports
+    // @ts-ignore — require is available in Node.js but not typed in browser tsconfig
     const nodeCrypto = require('crypto') as { randomFillSync(buf: Uint8Array): void };
     nodeCrypto.randomFillSync(arr);
   }
