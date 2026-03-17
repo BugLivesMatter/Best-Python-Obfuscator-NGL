@@ -1,0 +1,71 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="900" height="200" viewBox="0 0 900 200">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#0a0a0a"/>
+      <stop offset="100%" stop-color="#111111"/>
+    </linearGradient>
+    <linearGradient id="glow" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#ffffff" stop-opacity="0"/>
+      <stop offset="50%" stop-color="#ffffff" stop-opacity="0.06"/>
+      <stop offset="100%" stop-color="#ffffff" stop-opacity="0"/>
+    </linearGradient>
+    <filter id="blur">
+      <feGaussianBlur in="SourceGraphic" stdDeviation="18"/>
+    </filter>
+  </defs>
+
+  <!-- Background -->
+  <rect width="900" height="200" fill="url(#bg)" rx="12"/>
+  <rect width="900" height="200" fill="url(#glow)" rx="12"/>
+
+  <!-- Border -->
+  <rect width="898" height="198" x="1" y="1" fill="none" stroke="rgba(255,255,255,0.08)" stroke-width="1" rx="12"/>
+
+  <!-- Ambient glow blob -->
+  <ellipse cx="450" cy="100" rx="300" ry="60" fill="rgba(120,80,255,0.06)" filter="url(#blur)"/>
+
+  <!-- Matrix rain symbols (decorative, left side) -->
+  <text x="28" y="48"  font-family="Courier New, monospace" font-size="11" fill="rgba(255,255,255,0.12)">def</text>
+  <text x="28" y="66"  font-family="Courier New, monospace" font-size="11" fill="rgba(255,255,255,0.06)">lI</text>
+  <text x="28" y="84"  font-family="Courier New, monospace" font-size="11" fill="rgba(255,255,255,0.09)">for</text>
+  <text x="28" y="102" font-family="Courier New, monospace" font-size="11" fill="rgba(255,255,255,0.05)">Il</text>
+  <text x="28" y="120" font-family="Courier New, monospace" font-size="11" fill="rgba(255,255,255,0.12)">if</text>
+  <text x="28" y="138" font-family="Courier New, monospace" font-size="11" fill="rgba(255,255,255,0.07)">λ</text>
+  <text x="28" y="156" font-family="Courier New, monospace" font-size="11" fill="rgba(255,255,255,0.04)">ll</text>
+
+  <text x="50" y="55"  font-family="Courier New, monospace" font-size="11" fill="rgba(255,255,255,0.07)">in</text>
+  <text x="50" y="73"  font-family="Courier New, monospace" font-size="11" fill="rgba(255,255,255,0.13)">lI</text>
+  <text x="50" y="91"  font-family="Courier New, monospace" font-size="11" fill="rgba(255,255,255,0.05)">:=</text>
+  <text x="50" y="109" font-family="Courier New, monospace" font-size="11" fill="rgba(255,255,255,0.09)">II</text>
+  <text x="50" y="127" font-family="Courier New, monospace" font-size="11" fill="rgba(255,255,255,0.06)">1l</text>
+  <text x="50" y="145" font-family="Courier New, monospace" font-size="11" fill="rgba(255,255,255,0.11)">{}</text>
+
+  <!-- Matrix rain symbols (decorative, right side) -->
+  <text x="838" y="48"  font-family="Courier New, monospace" font-size="11" fill="rgba(255,255,255,0.07)">Il</text>
+  <text x="838" y="66"  font-family="Courier New, monospace" font-size="11" fill="rgba(255,255,255,0.12)">def</text>
+  <text x="838" y="84"  font-family="Courier New, monospace" font-size="11" fill="rgba(255,255,255,0.05)">lI</text>
+  <text x="838" y="102" font-family="Courier New, monospace" font-size="11" fill="rgba(255,255,255,0.09)">for</text>
+  <text x="838" y="120" font-family="Courier New, monospace" font-size="11" fill="rgba(255,255,255,0.06)">λ</text>
+  <text x="838" y="138" font-family="Courier New, monospace" font-size="11" fill="rgba(255,255,255,0.12)">ll</text>
+  <text x="838" y="156" font-family="Courier New, monospace" font-size="11" fill="rgba(255,255,255,0.05)">if</text>
+
+  <text x="860" y="55"  font-family="Courier New, monospace" font-size="11" fill="rgba(255,255,255,0.10)">1l</text>
+  <text x="860" y="73"  font-family="Courier New, monospace" font-size="11" fill="rgba(255,255,255,0.06)">in</text>
+  <text x="860" y="91"  font-family="Courier New, monospace" font-size="11" fill="rgba(255,255,255,0.13)">Il</text>
+  <text x="860" y="109" font-family="Courier New, monospace" font-size="11" fill="rgba(255,255,255,0.05)">:=</text>
+  <text x="860" y="127" font-family="Courier New, monospace" font-size="11" fill="rgba(255,255,255,0.09)">{}</text>
+  <text x="860" y="145" font-family="Courier New, monospace" font-size="11" fill="rgba(255,255,255,0.07)">II</text>
+
+  <!-- Main title -->
+  <text x="450" y="88" text-anchor="middle" font-family="Courier New, monospace" font-size="13" font-weight="bold" fill="rgba(255,255,255,0.28)">{</text>
+  <text x="450" y="88" text-anchor="middle" font-family="'Courier New', monospace" font-size="44" font-weight="900" fill="white" dx="-4">pyobfuscator</text>
+  <text x="450" y="88" text-anchor="middle" font-family="Courier New, monospace" font-size="13" font-weight="bold" fill="rgba(255,255,255,0.28)" dx="228">}</text>
+
+  <!-- Subtitle -->
+  <text x="450" y="116" text-anchor="middle" font-family="Courier New, monospace" font-size="12" fill="rgba(255,255,255,0.35)" letter-spacing="4">PYTHON CODE OBFUSCATION ENGINE</text>
+
+  <!-- Live badge -->
+  <rect x="330" y="138" width="240" height="32" rx="8" fill="rgba(255,255,255,0.05)" stroke="rgba(255,255,255,0.12)" stroke-width="1"/>
+  <circle cx="354" cy="154" r="4" fill="#4ade80"/>
+  <text x="366" y="158" font-family="Courier New, monospace" font-size="12" fill="rgba(255,255,255,0.65)">Try it Live  →  web app</text>
+</svg>

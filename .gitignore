@@ -41,3 +41,13 @@ example_obfuscated.py
 example_nominify.py
 obfuscated.py
 *.log
+
+# Generated output files
+example.py
+obf_example.py
+obf_example_launcher.c
+obf_*.py
+*_launcher.c
+
+# Claude local settings
+.claude/settings.local.json
